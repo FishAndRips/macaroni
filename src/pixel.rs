@@ -7,16 +7,7 @@ macro_rules! convert_channel {
             const FROM: u16 = make_ones($from_bits) as u16;
             const TO: u16 = make_ones($to_bits) as u16;
 
-            let result = (((($channel as u16) & FROM) << 1) as u16) * (TO << 1) / (FROM << 1);
-            let result_rounded_down = (result >> 1) as u8;
-
-            // Round up?
-            if (result & 1) != 0 {
-                result_rounded_down + 1
-            }
-            else {
-                result_rounded_down
-            }
+            ((($channel as u16) * TO + (FROM / 2)) / FROM) as u8
         }
     }
 }
@@ -58,7 +49,7 @@ macro_rules! blorp_pixel {
 }
 
 /// Defines a color with 8-bit alpha, red, green, and blue.
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct Pixel {
     pub alpha: u8,
     pub red: u8,
