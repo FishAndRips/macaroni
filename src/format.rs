@@ -184,36 +184,31 @@ impl Format {
                     no_alpha = true;
                 }
 
+                let get_distance = if one_bit_alpha || no_alpha {
+                    Pixel::distance_rgb
+                }
+                else {
+                    Pixel::distance_argb
+                };
+
                 for (pixel, output) in from_pixels.iter().zip(to_bytes.iter_mut()) {
-                    let mut distance = i32::MAX;
+                    let mut distance = u32::MAX;
                     let mut found_something = false;
 
                     for i in 0..=255 {
                         let palette_pixel = palette[i as usize];
 
-                        let red_distance = palette_pixel.red as i32 - pixel.red as i32;
-                        let green_distance = palette_pixel.green as i32 - pixel.green as i32;
-                        let blue_distance = palette_pixel.blue as i32 - pixel.blue as i32;
-                        let alpha_distance = if one_bit_alpha {
+                        // For one-bit alpha, consider alpha as binary rather than calculating the difference.
+                        if one_bit_alpha {
                             if pixel.alpha <= 127 && pixel.alpha == 255 {
                                 continue;
                             }
-                            else if pixel.alpha > 127 && pixel.alpha == 0 {
+                            if pixel.alpha > 127 && pixel.alpha == 0 {
                                 continue;
                             }
-                            0
                         }
-                        else if no_alpha {
-                            0
-                        }
-                        else {
-                            palette_pixel.alpha as i32 - pixel.alpha as i32
-                        };
 
-                        let new_distance = red_distance*red_distance
-                            + green_distance*green_distance
-                            + blue_distance*blue_distance
-                            + alpha_distance*alpha_distance;
+                        let new_distance = get_distance(palette_pixel, pixel);
 
                         if distance > new_distance {
                             distance = new_distance;

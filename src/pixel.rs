@@ -222,6 +222,20 @@ impl Pixel {
         [self.red, self.green, self.blue, self.alpha]
     }
 
+    /// Returns distance squared between two pixels, also including alpha as its own channel.
+    pub(crate) const fn distance_argb(self, other: &Self) -> u32 {
+        let alpha_distance = self.alpha as i32 - other.alpha as i32;
+        (alpha_distance*alpha_distance) as u32 + self.distance_rgb(other)
+    }
+
+    /// Returns distance squared between two pixels, ignoring alpha.
+    pub(crate) const fn distance_rgb(self, other: &Self) -> u32 {
+        let red_distance = self.red as i32 - other.red as i32;
+        let green_distance = self.green as i32 - other.green as i32;
+        let blue_distance = self.blue as i32 - other.blue as i32;
+
+        (red_distance*red_distance + green_distance*green_distance + blue_distance*blue_distance) as u32
+    }
 }
 
 const fn make_ones(size: usize) -> u8 {
