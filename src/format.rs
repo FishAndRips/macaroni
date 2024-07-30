@@ -42,6 +42,9 @@ pub enum Format {
     /// 8-bit alpha, red, green, and blue
     A8R8G8B8,
 
+    /// 8-bit alpha, blue, green, and red
+    A8B8G8R8,
+
     /// 8-bit palettized
     Palettized([Pixel; 256]),
 }
@@ -76,6 +79,7 @@ impl Format {
             Format::A4R4G4B4 => 1,
             Format::X8R8G8B8 => 1,
             Format::A8R8G8B8 => 1,
+            Format::A8B8G8R8 => 1,
             Format::Palettized(_) => 1
         }
     }
@@ -105,6 +109,7 @@ impl Format {
             Format::A4R4G4B4 => 2,
             Format::X8R8G8B8 => 4,
             Format::A8R8G8B8 => 4,
+            Format::A8B8G8R8 => 4,
             Format::Palettized(_) => 1
         }
     }
@@ -156,7 +161,70 @@ impl Format {
             Format::BC7 => todo!(),
 
             // Palettized
-            Format::Palettized(_) => todo!(),
+            Format::Palettized(palette) => {
+                let mut no_alpha = true;
+                let mut one_bit_alpha = true;
+                let mut alpha_255_exists = false;
+                for i in palette {
+                    if i.alpha != 255 {
+                        no_alpha = false;
+                        if i.alpha != 0 {
+                            one_bit_alpha = false;
+                        }
+                    }
+                    else {
+                        alpha_255_exists = true;
+                    }
+                }
+
+                // If all pixels in the palette are 100% transparent, disregard the alpha when
+                // encoding, because it doesn't make sense to check alpha when finding a pixel.
+                if one_bit_alpha && alpha_255_exists {
+                    one_bit_alpha = false;
+                    no_alpha = true;
+                }
+
+                for (pixel, output) in from_pixels.iter().zip(to_bytes.iter_mut()) {
+                    let mut distance = i32::MAX;
+                    let mut found_something = false;
+
+                    for i in 0..=255 {
+                        let palette_pixel = palette[i as usize];
+
+                        let red_distance = palette_pixel.red as i32 - pixel.red as i32;
+                        let green_distance = palette_pixel.green as i32 - pixel.green as i32;
+                        let blue_distance = palette_pixel.blue as i32 - pixel.blue as i32;
+                        let alpha_distance = if one_bit_alpha {
+                            if pixel.alpha <= 127 && pixel.alpha == 255 {
+                                continue;
+                            }
+                            else if pixel.alpha > 127 && pixel.alpha == 0 {
+                                continue;
+                            }
+                            0
+                        }
+                        else if no_alpha {
+                            0
+                        }
+                        else {
+                            palette_pixel.alpha as i32 - pixel.alpha as i32
+                        };
+
+                        let new_distance = red_distance*red_distance
+                            + green_distance*green_distance
+                            + blue_distance*blue_distance
+                            + alpha_distance*alpha_distance;
+
+                        if distance > new_distance {
+                            distance = new_distance;
+                            *output = i;
+                            found_something = true;
+                        }
+                    }
+
+                    debug_assert!(found_something, "no pixels found (should not happen)");
+                }
+            }
 
             // Simple conversion (uncompressed)
             _ => {
@@ -170,6 +238,7 @@ impl Format {
                     Format::A4R4G4B4 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_a4r4g4b4()),
                     Format::X8R8G8B8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_x8r8g8b8()),
                     Format::A8R8G8B8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_a8r8g8b8()),
+                    Format::A8B8G8R8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_a8b8g8r8()),
                     n => unreachable!("can't convert {:?}", n)
                 };
 
@@ -206,7 +275,11 @@ impl Format {
             Format::BC7 => todo!(),
 
             // Palettized
-            Format::Palettized(_) => todo!(),
+            Format::Palettized(p) => {
+                for (chunk, pixel) in from_bytes.iter().zip(to_pixels.iter_mut()) {
+                    *pixel = p[*chunk as usize]
+                }
+            },
 
             // Simple conversion (uncompressed)
             _ => {
@@ -220,6 +293,7 @@ impl Format {
                     Format::A4R4G4B4 => |from: &[u8]| Pixel::from_a4r4g4b4(from.try_into().unwrap()),
                     Format::X8R8G8B8 => |from: &[u8]| Pixel::from_x8r8g8b8(from.try_into().unwrap()),
                     Format::A8R8G8B8 => |from: &[u8]| Pixel::from_a8r8g8b8(from.try_into().unwrap()),
+                    Format::A8B8G8R8 => |from: &[u8]| Pixel::from_a8b8g8r8(from.try_into().unwrap()),
                     n => unreachable!("can't convert {:?}", n)
                 };
 

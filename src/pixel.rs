@@ -211,6 +211,17 @@ impl Pixel {
         [self.blue, self.green, self.red, self.alpha]
     }
 
+    /// Load a pixel from 32-bit A8B8G8R8 (little endian).
+    pub const fn from_a8b8g8r8(bytes: [u8; 4]) -> Self {
+        let [red, green, blue, alpha] = bytes;
+        Self { alpha, red, green, blue }
+    }
+
+    /// Encode the pixel as 32-bit A8B8G8R8 (little endian).
+    pub const fn as_a8b8g8r8(self) -> [u8; 4] {
+        [self.red, self.green, self.blue, self.alpha]
+    }
+
 }
 
 const fn make_ones(size: usize) -> u8 {
