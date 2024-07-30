@@ -1,7 +1,7 @@
 macro_rules! convert_channel {
     ($from_bits:expr, $to_bits:expr, $channel:expr) => {
         if $from_bits == 0 || $to_bits == 0 {
-            255
+            u8::MAX
         }
         else {
             const FROM: u16 = make_ones($from_bits) as u16;
@@ -57,95 +57,45 @@ pub struct Pixel {
     pub blue: u8
 }
 impl Pixel {
-    pub const fn from_a8r8g8b8(color: u32) -> Self {
+    /// Load a pixel from 8-bit A8.
+    ///
+    /// Red, green, and blue channels will be set to 255.
+    pub const fn from_a8(a8: [u8; 1]) -> Self {
         Self {
-            alpha: (color >> 24) as u8,
-            red: (color >> 16) as u8,
-            green: (color >> 8) as u8,
-            blue: color as u8,
-        }
-    }
-    pub const fn from_a8r8g8b8_bytes(bytes: [u8; 4]) -> Self {
-        Self {
-            alpha: bytes[0],
-            red: bytes[1],
-            green: bytes[2],
-            blue: bytes[3],
-        }
-    }
-    pub const fn from_b8g8r8a8(color: u32) -> Self {
-        Self {
-            alpha: color as u8,
-            red: (color >> 8) as u8,
-            green: (color >> 16) as u8,
-            blue: (color >> 24) as u8,
-        }
-    }
-    pub const fn from_b8g8r8a8_bytes(bytes: [u8; 4]) -> Self {
-        Self {
-            alpha: bytes[3],
-            red: bytes[2],
-            green: bytes[1],
-            blue: bytes[0],
-        }
-    }
-    pub const fn as_a8r8g8b8(self) -> u32 {
-        (self.blue as u32)
-            | ((self.green as u32) << 8)
-            | ((self.red as u32) << 16)
-            | ((self.alpha as u32) << 24)
-    }
-    pub const fn as_a8r8g8b8_bytes(self) -> [u8; 4] {
-        [self.alpha, self.red, self.green, self.blue]
-    }
-    pub const fn as_b8g8r8a8(self) -> u32 {
-        (self.alpha as u32)
-            | ((self.red as u32) << 8)
-            | ((self.green as u32) << 16)
-            | ((self.blue as u32) << 24)
-    }
-    pub const fn as_b8g8r8a8_bytes(self) -> [u8; 4] {
-        [self.blue, self.green, self.red, self.alpha]
-    }
-
-    pub const fn from_a8(a8: u8) -> Self {
-        Self {
-            alpha: a8,
+            alpha: a8[0],
             red: 255,
             green: 255,
             blue: 255
         }
     }
-    pub const fn as_a8(self) -> u8 {
-        self.alpha
+
+    /// Encode the pixel as 8-bit A8.
+    pub const fn as_a8(self) -> [u8; 1] {
+        [self.alpha]
     }
 
-    pub const fn from_ay8(ay8: u8) -> Self {
+    /// Load a pixel from 8-bit AY8.
+    pub const fn from_ay8(ay8: [u8; 1]) -> Self {
         Self {
-            alpha: ay8,
-            red: ay8,
-            green: ay8,
-            blue: ay8
+            alpha: ay8[0],
+            red: ay8[0],
+            green: ay8[0],
+            blue: ay8[0]
         }
     }
-    pub const fn as_ay8(self) -> u8 {
-        self.alpha
+
+    /// Encode the pixel as 8-bit AY8.
+    ///
+    /// This functionally does the same thing as [`as_a8()`](Pixel::as_a8).
+    pub const fn as_ay8(self) -> [u8; 1] {
+        [self.alpha]
     }
 
-    pub const fn from_a8y8(a8y8: u16) -> Self {
-        Self {
-            alpha: (a8y8 >> 8) as u8,
-            .. Self::from_y8(a8y8 as u8)
-        }
-    }
-    pub const fn as_a8y8(self) -> u16 {
-        ((self.alpha as u16) << 8) | (self.as_y8() as u16)
-    }
-
-    pub const fn as_y8(self) -> u8 {
-        self.blue
-    }
-    pub const fn from_y8(y8: u8) -> Self {
+    /// Load a pixel from 8-bit Y8.
+    ///
+    /// The pixel will have 255 alpha.
+    pub const fn from_y8(y8: [u8; 1]) -> Self {
+        let [y8] = y8;
         Self {
             alpha: 255,
             red: y8,
@@ -154,45 +104,113 @@ impl Pixel {
         }
     }
 
-    pub const fn from_r5g6b5(pixel: u16) -> Self {
+    /// Encode the pixel as 8-bit Y8.
+    ///
+    /// Rec. 601 Luma will be used to convert non-monochrome colors to monochrome.
+    ///
+    /// `Y = 0.299 * self.red + 0.587 * self.green + 0.114 * self.blue`
+    pub const fn as_y8(self) -> [u8; 1] {
+        if self.red == self.blue && self.blue == self.green {
+            return [self.blue]
+        }
+
+        let red = (299 * self.red as u32 + 255/2) / 255;
+        let green = (587 * self.green as u32 + 255/2) / 255;
+        let blue = (114 * self.blue as u32 + 255/2) / 255;
+
+        let sum = red + green + blue;
+
+        [(sum * 255 / 1000) as u8]
+    }
+
+    /// Load a pixel from 16-bit A8Y8 (little endian).
+    pub const fn from_a8y8(a8y8: [u8; 2]) -> Self {
+        Self {
+            alpha: a8y8[1],
+            .. Self::from_y8([a8y8[0]])
+        }
+    }
+
+    /// Encode the pixel as 16-bit A8Y8 (little endian).
+    pub const fn as_a8y8(self) -> [u8; 2] {
+        let [y8] = self.as_y8();
+        let [a8] = self.as_a8();
+        [y8, a8]
+    }
+
+    /// Load a pixel from 16-bit R5G6B5 (little endian).
+    ///
+    /// The pixel will have 255 alpha.
+    pub const fn from_r5g6b5(r5g6b5: [u8; 2]) -> Self {
+        let pixel = u16::from_le_bytes(r5g6b5);
         let color = Self {
-            alpha: 255,
+            alpha: u8::MAX,
             .. split_pixel!(pixel,0,5,6,5)
         };
         convert_pixel!(color,0,5,6,5,8,8,8,8)
     }
-    pub const fn as_r5g6b5(self) -> u16 {
+
+    /// Encode the pixel as 16-bit R5G6B5 (little endian).
+    pub const fn as_r5g6b5(self) -> [u8; 2] {
         let color = convert_pixel!(self,8,8,8,8,0,5,6,5);
-        blorp_pixel!(color,0,5,6,5,u32) as u16
+        (blorp_pixel!(color,0,5,6,5,u32) as u16).to_le_bytes()
     }
 
-    pub const fn from_a1r5g5b5(pixel: u16) -> Self {
+    /// Load a pixel from 16-bit A1R5G5B5 (little endian).
+    pub const fn from_a1r5g5b5(a1r5g5b5: [u8; 2]) -> Self {
+        let pixel = u16::from_le_bytes(a1r5g5b5);
         let color = split_pixel!(pixel,1,5,5,5);
         convert_pixel!(color,1,5,5,5,8,8,8,8)
     }
-    pub const fn as_a1r5g5b5(self) -> u16 {
+
+    /// Encode the pixel as 16-bit A1R5G5B5 (little endian).
+    pub const fn as_a1r5g5b5(self) -> [u8; 2] {
         let color = convert_pixel!(self,8,8,8,8,1,5,5,5);
-        blorp_pixel!(color,1,5,5,5,u16)
+        blorp_pixel!(color,1,5,5,5,u16).to_le_bytes()
     }
 
-    pub const fn from_a4r4g4b4(pixel: u16) -> Self {
+    /// Load a pixel from 16-bit A4R4G4B4 (little endian).
+    pub const fn from_a4r4g4b4(a4r4g4b4: [u8; 2]) -> Self {
+        let pixel = u16::from_le_bytes(a4r4g4b4);
         let color = split_pixel!(pixel,4,4,4,4);
         convert_pixel!(color,4,4,4,4,8,8,8,8)
     }
-    pub const fn as_a4r4g4b4(self) -> u16 {
+
+    /// Encode the pixel as 16-bit A4R4G4B4 (little endian).
+    pub const fn as_a4r4g4b4(self) -> [u8; 2] {
         let color = convert_pixel!(self,8,8,8,8,4,4,4,4);
-        blorp_pixel!(color,4,4,4,4,u16)
+        blorp_pixel!(color,4,4,4,4,u16).to_le_bytes()
     }
 
-    pub const fn from_x8r8g8b8(pixel: u32) -> Self {
+    /// Load a pixel from 32-bit X8R8G8B8 (little endian).
+    ///
+    /// The pixel will have 255 alpha.
+    pub const fn from_x8r8g8b8(pixel: [u8; 4]) -> Self {
+        let [blue, green, red, _] = pixel;
         Self {
-            alpha: 255,
-            .. split_pixel!(pixel, 8, 8, 8, 8)
+            alpha: u8::MAX,
+            red, green, blue
         }
     }
-    pub const fn as_x8r8g8b8(self) -> u32 {
-        self.as_a8r8g8b8() | 0xFF000000
+
+    /// Encode the pixel as 32-bit X8R8G8B8 (little endian).
+    ///
+    /// The alpha value of the pixel will be ignored.
+    pub const fn as_x8r8g8b8(self) -> [u8; 4] {
+        [self.blue, self.green, self.red, 0xFF]
     }
+
+    /// Load a pixel from 32-bit A8R8G8B8 (little endian).
+    pub const fn from_a8r8g8b8(bytes: [u8; 4]) -> Self {
+        let [blue, green, red, alpha] = bytes;
+        Self { alpha, red, green, blue }
+    }
+
+    /// Encode the pixel as 32-bit A8R8G8B8 (little endian).
+    pub const fn as_a8r8g8b8(self) -> [u8; 4] {
+        [self.blue, self.green, self.red, self.alpha]
+    }
+
 }
 
 const fn make_ones(size: usize) -> u8 {

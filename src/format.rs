@@ -161,39 +161,15 @@ impl Format {
             // Simple conversion (uncompressed)
             _ => {
                 let converter = match self {
-                    Format::A8 => |pixel: Pixel, to: &mut [u8]| {
-                        to[0] = pixel.as_a8();
-                    },
-                    Format::Y8 => |pixel: Pixel, to: &mut [u8]| {
-                        to[0] = pixel.as_y8();
-                    },
-                    Format::AY8 => |pixel: Pixel, to: &mut [u8]| {
-                        to[0] = pixel.as_ay8();
-                    },
-                    Format::A8Y8 => |pixel: Pixel, to: &mut [u8]| {
-                        let bytes = pixel.as_a8y8().to_le_bytes();
-                        to.copy_from_slice(&bytes);
-                    },
-                    Format::R5G6B5 => |pixel: Pixel, to: &mut [u8]| {
-                        let bytes = pixel.as_r5g6b5().to_le_bytes();
-                        to.copy_from_slice(&bytes);
-                    },
-                    Format::A1R5G5B5 => |pixel: Pixel, to: &mut [u8]| {
-                        let bytes = pixel.as_a1r5g5b5().to_le_bytes();
-                        to.copy_from_slice(&bytes);
-                    },
-                    Format::A4R4G4B4 => |pixel: Pixel, to: &mut [u8]| {
-                        let bytes = pixel.as_a4r4g4b4().to_le_bytes();
-                        to.copy_from_slice(&bytes);
-                    },
-                    Format::X8R8G8B8 => |pixel: Pixel, to: &mut [u8]| {
-                        let bytes = pixel.as_x8r8g8b8().to_le_bytes();
-                        to.copy_from_slice(&bytes);
-                    },
-                    Format::A8R8G8B8 => |pixel: Pixel, to: &mut [u8]| {
-                        let bytes = pixel.as_a8r8g8b8().to_le_bytes();
-                        to.copy_from_slice(&bytes);
-                    },
+                    Format::A8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_a8()),
+                    Format::Y8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_y8()),
+                    Format::AY8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_ay8()),
+                    Format::A8Y8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_a8y8()),
+                    Format::R5G6B5 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_r5g6b5()),
+                    Format::A1R5G5B5 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_a1r5g5b5()),
+                    Format::A4R4G4B4 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_a4r4g4b4()),
+                    Format::X8R8G8B8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_x8r8g8b8()),
+                    Format::A8R8G8B8 => |pixel: Pixel, to: &mut [u8]| to.copy_from_slice(&pixel.as_a8r8g8b8()),
                     n => unreachable!("can't convert {:?}", n)
                 };
 
@@ -235,33 +211,15 @@ impl Format {
             // Simple conversion (uncompressed)
             _ => {
                 let converter = match self {
-                    Format::A8 => |from: &[u8]| -> Pixel {
-                        Pixel::from_a8(from[0])
-                    },
-                    Format::Y8 => |from: &[u8]| -> Pixel {
-                        Pixel::from_y8(from[0])
-                    },
-                    Format::AY8 => |from: &[u8]| -> Pixel {
-                        Pixel::from_ay8(from[0])
-                    },
-                    Format::A8Y8 => |from: &[u8]| -> Pixel {
-                        Pixel::from_a8y8(u16::from_le_bytes(from.try_into().unwrap()))
-                    },
-                    Format::R5G6B5 => |from: &[u8]| -> Pixel {
-                        Pixel::from_r5g6b5(u16::from_le_bytes(from.try_into().unwrap()))
-                    },
-                    Format::A1R5G5B5 => |from: &[u8]| -> Pixel {
-                        Pixel::from_a1r5g5b5(u16::from_le_bytes(from.try_into().unwrap()))
-                    },
-                    Format::A4R4G4B4 => |from: &[u8]| -> Pixel {
-                        Pixel::from_a4r4g4b4(u16::from_le_bytes(from.try_into().unwrap()))
-                    },
-                    Format::X8R8G8B8 => |from: &[u8]| -> Pixel {
-                        Pixel::from_x8r8g8b8(u32::from_le_bytes(from.try_into().unwrap()))
-                    },
-                    Format::A8R8G8B8 => |from: &[u8]| -> Pixel {
-                        Pixel::from_a8r8g8b8(u32::from_le_bytes(from.try_into().unwrap()))
-                    },
+                    Format::A8 => |from: &[u8]| Pixel::from_a8(from.try_into().unwrap()),
+                    Format::Y8 => |from: &[u8]| Pixel::from_y8(from.try_into().unwrap()),
+                    Format::AY8 => |from: &[u8]| Pixel::from_ay8(from.try_into().unwrap()),
+                    Format::A8Y8 => |from: &[u8]| Pixel::from_a8y8(from.try_into().unwrap()),
+                    Format::R5G6B5 => |from: &[u8]| Pixel::from_r5g6b5(from.try_into().unwrap()),
+                    Format::A1R5G5B5 => |from: &[u8]| Pixel::from_a1r5g5b5(from.try_into().unwrap()),
+                    Format::A4R4G4B4 => |from: &[u8]| Pixel::from_a4r4g4b4(from.try_into().unwrap()),
+                    Format::X8R8G8B8 => |from: &[u8]| Pixel::from_x8r8g8b8(from.try_into().unwrap()),
+                    Format::A8R8G8B8 => |from: &[u8]| Pixel::from_a8r8g8b8(from.try_into().unwrap()),
                     n => unreachable!("can't convert {:?}", n)
                 };
 

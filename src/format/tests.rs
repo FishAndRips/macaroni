@@ -24,11 +24,11 @@ pub fn roundtrip_32bit() {
 
     let mut output = [0u8; 128*128*4];
     Format::A8R8G8B8.encode_pixels(&ringhopper, &mut output, 128, 128);
-    assert_eq!(RINGHOPPER_PENGY, output);
+    assert_eq!(RINGHOPPER_PENGY[138..], output);
 
     let mut output = [0u8; 128*128*4];
     Format::X8R8G8B8.encode_pixels(&ringhopper, &mut output, 128, 128);
-    assert_eq!(RINGHOPPER_PENGY, output);
+    assert_eq!(RINGHOPPER_PENGY[138..], output);
 }
 
 #[test]
