@@ -46,7 +46,7 @@ pub enum Format {
     A8B8G8R8,
 
     /// 8-bit palettized
-    Palettized([Pixel; 256]),
+    P8([Pixel; 256]),
 }
 
 impl Format {
@@ -80,7 +80,7 @@ impl Format {
             Format::X8R8G8B8 => 1,
             Format::A8R8G8B8 => 1,
             Format::A8B8G8R8 => 1,
-            Format::Palettized(_) => 1
+            Format::P8(_) => 1
         }
     }
 
@@ -110,7 +110,7 @@ impl Format {
             Format::X8R8G8B8 => 4,
             Format::A8R8G8B8 => 4,
             Format::A8B8G8R8 => 4,
-            Format::Palettized(_) => 1
+            Format::P8(_) => 1
         }
     }
 
@@ -161,64 +161,10 @@ impl Format {
             Format::BC7 => todo!(),
 
             // Palettized
-            Format::Palettized(palette) => {
-                let mut no_alpha = true;
-                let mut one_bit_alpha = true;
-                let mut alpha_255_exists = false;
-                for i in palette {
-                    if i.alpha != 255 {
-                        no_alpha = false;
-                        if i.alpha != 0 {
-                            one_bit_alpha = false;
-                        }
-                    }
-                    else {
-                        alpha_255_exists = true;
-                    }
-                }
-
-                // If all pixels in the palette are 100% transparent, disregard the alpha when
-                // encoding, because it doesn't make sense to check alpha when finding a pixel.
-                if one_bit_alpha && alpha_255_exists {
-                    one_bit_alpha = false;
-                    no_alpha = true;
-                }
-
-                let get_distance = if one_bit_alpha || no_alpha {
-                    Pixel::distance_rgb
-                }
-                else {
-                    Pixel::distance_argb
-                };
-
-                for (pixel, output) in from_pixels.iter().zip(to_bytes.iter_mut()) {
-                    let mut distance = u32::MAX;
-                    let mut found_something = false;
-
-                    for i in 0..=255 {
-                        let palette_pixel = palette[i as usize];
-
-                        // For one-bit alpha, consider alpha as binary rather than calculating the difference.
-                        if one_bit_alpha {
-                            if pixel.alpha <= 127 && pixel.alpha == 255 {
-                                continue;
-                            }
-                            if pixel.alpha > 127 && pixel.alpha == 0 {
-                                continue;
-                            }
-                        }
-
-                        let new_distance = get_distance(palette_pixel, pixel);
-
-                        if distance > new_distance {
-                            distance = new_distance;
-                            *output = i;
-                            found_something = true;
-                        }
-                    }
-
-                    debug_assert!(found_something, "no pixels found (should not happen)");
-                }
+            Format::P8(palette) => {
+                encode_palettized(from_pixels.iter(), &palette)
+                    .zip(to_bytes.iter_mut())
+                    .for_each(|(input, output)| *output = input as u8)
             }
 
             // Simple conversion (uncompressed)
@@ -270,7 +216,7 @@ impl Format {
             Format::BC7 => todo!(),
 
             // Palettized
-            Format::Palettized(p) => {
+            Format::P8(p) => {
                 for (chunk, pixel) in from_bytes.iter().zip(to_pixels.iter_mut()) {
                     *pixel = p[*chunk as usize]
                 }
@@ -299,6 +245,75 @@ impl Format {
             }
         }
     }
+}
+
+/// Return an iterator that encodes one iterator of pixels into indices that correspond to a
+/// given palette.
+///
+/// # Panics
+///
+/// Panics if `palette.is_empty()`
+pub fn encode_palettized<'a, 'b, I: Iterator<Item = &'a Pixel> + 'a + 'b>(
+    from_pixels: I,
+    palette: &'b [Pixel]
+) -> impl Iterator<Item = usize> + 'a + 'b where 'b: 'a {
+    assert!(palette.len() > 0, "empty palette");
+
+    let mut no_alpha = true;
+    let mut one_bit_alpha = true;
+    let mut alpha_255_exists = false;
+    for i in palette {
+        if i.alpha != 255 {
+            no_alpha = false;
+            if i.alpha != 0 {
+                one_bit_alpha = false;
+            }
+        } else {
+            alpha_255_exists = true;
+        }
+    }
+
+    // If all pixels in the palette are 100% transparent, disregard the alpha when
+    // encoding, because it doesn't make sense to check alpha when finding a pixel.
+    if one_bit_alpha && alpha_255_exists {
+        one_bit_alpha = false;
+        no_alpha = true;
+    }
+
+    let get_distance = if one_bit_alpha || no_alpha {
+        Pixel::distance_rgb
+    } else {
+        Pixel::distance_argb
+    };
+
+    from_pixels
+        .map(move |pixel| {
+            let mut output = None;
+            let mut distance = u32::MAX;
+
+            for i in 0..palette.len() {
+                let palette_pixel = palette[i];
+
+                // For one-bit alpha, consider alpha as binary rather than calculating the difference.
+                if one_bit_alpha {
+                    if pixel.alpha <= 127 && pixel.alpha == 255 {
+                        continue;
+                    }
+                    if pixel.alpha > 127 && pixel.alpha == 0 {
+                        continue;
+                    }
+                }
+
+                let new_distance = get_distance(palette_pixel, pixel);
+
+                if distance > new_distance {
+                    distance = new_distance;
+                    output = Some(i);
+                }
+            }
+
+            output.expect("no pixels found")
+        })
 }
 
 #[cfg(test)]

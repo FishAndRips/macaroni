@@ -324,12 +324,12 @@ pub fn roundtrip_palettized() {
 
     let original = open_ringhopper_image();
     let mut output = [0u8; 128*128];
-    Format::Palettized(palette).encode_pixels(&original, &mut output, 128, 128);
+    Format::P8(palette).encode_pixels(&original, &mut output, 128, 128);
 
     let mut new_pixels_lossy = [Pixel::default(); 128*128];
-    Format::Palettized(palette).decode_pixels(&output, &mut new_pixels_lossy, 128, 128);
+    Format::P8(palette).decode_pixels(&output, &mut new_pixels_lossy, 128, 128);
 
     let mut output_again = [0u8; 128*128];
-    Format::Palettized(palette).encode_pixels(&new_pixels_lossy, &mut output_again, 128, 128);
+    Format::P8(palette).encode_pixels(&new_pixels_lossy, &mut output_again, 128, 128);
     assert_eq!(output, output_again);
 }
